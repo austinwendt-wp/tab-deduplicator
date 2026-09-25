@@ -222,6 +222,19 @@ button { cursor: pointer; border: none; font-family: inherit; }
   flex-shrink: 0;
 }
 
+.tab-age {
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+/* Warn visually when a tab hasn't been touched in a day or more. */
+.tab-age[data-stale="1"] { color: #e37400; }
+@media (prefers-color-scheme: dark) {
+  .tab-age[data-stale="1"] { color: #ffa724; }
+}
+
 /* ── Empty / loading state ───────────────────────────────────────── */
 .empty-state {
   padding: 24px 12px;

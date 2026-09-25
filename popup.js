@@ -37,7 +37,22 @@ function buildWindowLabels(tabs) {
   return labels;
 }
 
+// Returns a compact relative-time string for a lastAccessed timestamp.
+function formatAge(lastAccessed) {
+  if (!lastAccessed) return null;
+  const seconds = Math.floor((Date.now() - lastAccessed) / 1000);
+  if (seconds < 60)  return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60)  return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24)    return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 // Group tabs by normalized URL, returning only groups with ≥ 2 tabs.
+// Within each group tabs are sorted most-recently-accessed first so the
+// "Keep 1" action always preserves the freshest tab.
 function buildDuplicateGroups(tabs) {
   const map = new Map();
   for (const tab of tabs) {
@@ -47,7 +62,12 @@ function buildDuplicateGroups(tabs) {
   }
   return [...map.entries()]
     .filter(([, group]) => group.length >= 2)
-    .sort((a, b) => b[1].length - a[1].length); // Most dupes first.
+    .map(([key, group]) => {
+      // Sort: most recently accessed first (undefined lastAccessed sorts last).
+      group.sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+      return [key, group];
+    })
+    .sort((a, b) => b[1].length - a[1].length); // Most dupes first between groups.
 }
 
 function focusTab(tabId, windowId) {
@@ -131,10 +151,16 @@ async function render() {
         ? el('img', { className: 'favicon', src: tab.favIconUrl, alt: '' })
         : el('span', { className: 'favicon-placeholder' });
 
+      const age = formatAge(tab.lastAccessed);
       const label = el('span', { className: 'tab-label' },
         favicon,
         el('span', { className: 'tab-title' }, tab.title || tab.url || '(no title)'),
         el('span', { className: 'tab-window' }, windowLabels[tab.windowId]),
+        age ? el('span', {
+          className: 'tab-age',
+          title: new Date(tab.lastAccessed).toLocaleString(),
+          'data-stale': tab.lastAccessed && (Date.now() - tab.lastAccessed) > 86_400_000 ? '1' : '0',
+        }, age) : null,
       );
 
       const closeBtn = el('button', {
