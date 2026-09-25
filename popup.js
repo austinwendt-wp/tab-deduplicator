@@ -123,6 +123,22 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// Filter already-rendered groups by the current search query.
+// Each group element carries a data-search attribute with lowercased text
+// so filtering never touches the DOM structure, just visibility.
+function applyFilter(query) {
+  const q = query.trim().toLowerCase();
+  let visible = 0;
+  document.querySelectorAll('.group').forEach(el => {
+    const match = !q || el.dataset.search.includes(q);
+    el.hidden = !match;
+    if (match) visible++;
+  });
+
+  const noResults = document.getElementById('no-results');
+  if (noResults) noResults.hidden = visible > 0 || !q;
+}
+
 async function render() {
   const tabs = await chrome.tabs.query({});
   const windowLabels = buildWindowLabels(tabs);
@@ -137,19 +153,25 @@ async function render() {
   dedupAllBtn.onclick = () => deduplicateAll(groups);
 
   const list = document.getElementById('group-list');
-  const emptyState = document.getElementById('empty-state');
   list.innerHTML = '';
 
   if (groups.length === 0) {
-    const msg = el('div', { className: 'empty-state' }, '✓ No duplicate tabs found.');
-    list.appendChild(msg);
+    list.appendChild(el('div', { className: 'empty-state' }, '✓ No duplicate tabs found.'));
     return;
   }
 
+  // Sentinel shown when a search query matches nothing.
+  list.appendChild(el('div', { className: 'empty-state', id: 'no-results', hidden: '' }, 'No matching tabs.'));
+
   for (const [normalizedUrl, groupTabs] of groups) {
-    // Use the first tab's title as the group heading, fall back to the URL.
     const groupTitle = groupTabs[0].title || normalizedUrl;
     const groupId = `group-${groupTabs[0].id}`;
+    // Build a searchable string from all titles and URLs in the group.
+    const searchTokens = groupTabs
+      .flatMap(t => [t.title, t.url])
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
 
     const summary = el('summary', { className: 'group-summary' },
       el('span', { className: 'group-title' }, groupTitle),
@@ -193,13 +215,23 @@ async function render() {
       return row;
     });
 
-    const details = el('details', { id: groupId, className: 'group', open: '' },
+    const details = el('details', { id: groupId, className: 'group', open: '', 'data-search': searchTokens },
       summary,
       el('div', { className: 'tab-list' }, ...tabRows),
     );
 
     list.appendChild(details);
   }
+
+  // Re-apply any active search after the DOM is rebuilt.
+  const search = document.getElementById('search');
+  if (search?.value) applyFilter(search.value);
 }
 
-document.addEventListener('DOMContentLoaded', render);
+document.addEventListener('DOMContentLoaded', () => {
+  const search = document.getElementById('search');
+  search.addEventListener('input', () => applyFilter(search.value));
+  // Escape clears the search.
+  search.addEventListener('keydown', e => { if (e.key === 'Escape') { search.value = ''; applyFilter(''); } });
+  render();
+});
