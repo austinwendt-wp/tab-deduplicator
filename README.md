@@ -6,7 +6,9 @@ A lightweight Chrome extension (Manifest V3) that finds and closes duplicate tab
 
 - Displays a **live badge** on the extension icon showing your total tab count across every window.
 - Detects **duplicate tabs** by normalizing URLs (strips tracking params and hash fragments) so minor URL variations don't hide real duplicates.
-- Shows a **popup** listing every duplicate group with per-tab close buttons, a one-click "Keep 1" per group, and a global "Deduplicate All" button.
+- Shows a **popup** listing every duplicate group with per-tab close buttons, a one-click "Keep 1" per group, and a global "Deduplicate All" button. **Deduplicate All** closes every redundant tab across all groups in a single batch — keeping the most recently active tab in each group and closing the rest simultaneously. A confirmation dialog lists the tabs that will be closed (up to 10, with a count of any beyond that) before anything is removed.
+- Each tab row shows **how long ago it was last active** (e.g. `2h ago`, `4d ago`). Ages over 24 hours are highlighted in amber. Hovering the label shows the exact datetime.
+- Within each duplicate group, tabs are **sorted freshest-first** so "Keep 1" always preserves the most recently active copy and closes the stale ones.
 - Clicking any tab row **focuses that tab** and brings its window to the front.
 
 ## How URL normalization works
@@ -42,8 +44,9 @@ Listens to `chrome.tabs.onCreated`, `onRemoved`, `onUpdated`, `onAttached`, and 
 **`popup.js`**
 Contains all logic:
 - `normalizeUrl(rawUrl)` — strips hash, removes tracking params, sorts remaining params
-- `buildDuplicateGroups(tabs)` — groups tabs by normalized URL, filters to groups with ≥ 2 tabs
+- `buildDuplicateGroups(tabs)` — groups tabs by normalized URL, filters to groups with ≥ 2 tabs; sorts each group freshest-first using `tab.lastAccessed`
 - `buildWindowLabels(tabs)` — assigns stable "Window 1 / 2 / …" labels by first-seen order
+- `formatAge(lastAccessed)` — converts a millisecond timestamp to a compact relative string (`5m ago`, `3h ago`, `2d ago`)
 - `render()` — queries all tabs, builds the DOM, wires up close/focus/dedup actions
 - DOM is built with a minimal `el()` helper (no framework)
 

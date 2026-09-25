@@ -89,8 +89,23 @@ async function deduplicateGroup(tabs) {
 }
 
 async function deduplicateAll(groups) {
-  const toClose = groups.flatMap(([, tabs]) => tabs.slice(1).map(t => t.id));
-  await chrome.tabs.remove(toClose);
+  const tabsToClose = groups.flatMap(([, tabs]) => tabs.slice(1));
+  const tabCount = tabsToClose.length;
+  const groupCount = groups.length;
+
+  const PREVIEW_LIMIT = 10;
+  const preview = tabsToClose.slice(0, PREVIEW_LIMIT).map(t => {
+    const age = t.lastAccessed ? ` (${formatAge(t.lastAccessed)})` : '';
+    const title = (t.title || t.url || '(no title)').slice(0, 60);
+    return `  • ${title}${age}`;
+  }).join('\n');
+  const overflow = tabCount > PREVIEW_LIMIT ? `\n  … and ${tabCount - PREVIEW_LIMIT} more` : '';
+
+  const ok = confirm(
+    `Close ${tabCount} duplicate tab${tabCount !== 1 ? 's' : ''} across ${groupCount} group${groupCount !== 1 ? 's' : ''}?\n\nTabs to be closed:\n${preview}${overflow}\n\nThe most recently active tab in each group will be kept.`
+  );
+  if (!ok) return;
+  await chrome.tabs.remove(tabsToClose.map(t => t.id));
   render();
 }
 
