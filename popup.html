@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tab Deduplicator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="header-title">Tab Deduplicator</div>
+    <div class="header-stats">
+      <span id="total-tabs">— tabs</span>
+      <span class="divider">·</span>
+      <span id="dup-sets">— duplicate sets</span>
+    </div>
+    <button id="dedup-all" class="btn-primary" title="Keep the first tab in every duplicate group and close the rest">
+      Deduplicate All
+    </button>
+  </header>
+
+  <main id="group-list">
+    <div class="empty-state" id="empty-state">Loading…</div>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

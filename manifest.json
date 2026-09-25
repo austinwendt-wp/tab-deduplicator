@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Deduplicator",
+  "version": "1.0.0",
+  "description": "Find and close duplicate tabs across all open windows.",
+  "permissions": ["tabs", "storage"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tab Deduplicator"
+  }
+}
