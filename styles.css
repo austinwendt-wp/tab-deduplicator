@@ -221,6 +221,13 @@ button { cursor: pointer; border: none; font-family: inherit; }
   white-space: nowrap;
   flex-shrink: 0;
 }
+/* User-named windows get an accent tint so they stand out from tab-title fallbacks. */
+.tab-window[data-named="1"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: transparent;
+  font-weight: 500;
+}
 
 .tab-age {
   font-size: 10px;

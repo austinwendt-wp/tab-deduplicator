@@ -26,14 +26,67 @@ function normalizeUrl(rawUrl) {
   }
 }
 
-// Map windowId → human-readable label ("Window 1", "Window 2", …) in stable order.
-function buildWindowLabels(tabs) {
+function truncate(str, max = 22) {
+  return str.length > max ? str.slice(0, max - 1) + '…' : str;
+}
+
+// Queries the native host for Chrome window names (requires install.sh to have
+// been run). Sends each window's bounds so the host can match AppleScript
+// windows (which use internal IDs) back to extension window IDs by position.
+// Returns a map of windowId (string) → name, or {} if the host is not
+// installed or times out. The popup falls back gracefully in either case.
+// Queries the native host for Chrome window names. The chrome.windows API
+// and Chrome's AppleScript interface share the same internal window IDs, so
+// the host returns a direct id → name map with no bounds-matching needed.
+// Falls back to {} silently if the native host is not installed.
+function fetchWindowNames() {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve({}), 1000);
+    try {
+      chrome.runtime.sendNativeMessage(
+        'com.tabdeduplicator.windownames',
+        { action: 'getWindowNames' },
+        (response) => {
+          clearTimeout(timeout);
+          if (chrome.runtime.lastError || !response?.windowNames) {
+            resolve({});
+          } else {
+            resolve(response.windowNames);
+          }
+        }
+      );
+    } catch {
+      clearTimeout(timeout);
+      resolve({});
+    }
+  });
+}
+
+// Map windowId → { label, isNamed }. Priority order:
+//   1. Native name from AppleScript (custom name or active-tab title via Chrome's own API)
+//   2. Active tab title from the tabs query (same data, no native host required)
+//   3. "Window N" counter as last resort
+// isNamed is true when the native name differs from the active tab title,
+// meaning the user explicitly named the window via Window → Name Window.
+function buildWindowLabels(tabs, nativeNames = {}) {
   const order = [];
+  const activeTitle = {};
+
   for (const tab of tabs) {
     if (!order.includes(tab.windowId)) order.push(tab.windowId);
+    if (tab.active && tab.title) {
+      activeTitle[tab.windowId] = tab.title.trim();
+    }
   }
+
   const labels = {};
-  order.forEach((id, i) => { labels[id] = `Window ${i + 1}`; });
+  order.forEach((id, i) => {
+    const native = nativeNames[String(id)];
+    const fallback = activeTitle[id] ?? `Window ${i + 1}`;
+    const raw = native ?? fallback;
+    const isNamed = native != null && native !== activeTitle[id];
+    labels[id] = { label: truncate(raw), isNamed };
+  });
   return labels;
 }
 
@@ -124,8 +177,11 @@ function el(tag, attrs = {}, ...children) {
 }
 
 async function render() {
-  const tabs = await chrome.tabs.query({});
-  const windowLabels = buildWindowLabels(tabs);
+  const [tabs, nativeNames] = await Promise.all([
+    chrome.tabs.query({}),
+    fetchWindowNames(),
+  ]);
+  const windowLabels = buildWindowLabels(tabs, nativeNames);
   const groups = buildDuplicateGroups(tabs);
 
   document.getElementById('total-tabs').textContent = `${tabs.length} tab${tabs.length !== 1 ? 's' : ''}`;
@@ -170,7 +226,10 @@ async function render() {
       const label = el('span', { className: 'tab-label' },
         favicon,
         el('span', { className: 'tab-title' }, tab.title || tab.url || '(no title)'),
-        el('span', { className: 'tab-window' }, windowLabels[tab.windowId]),
+        el('span', {
+          className: 'tab-window',
+          'data-named': windowLabels[tab.windowId].isNamed ? '1' : '0',
+        }, windowLabels[tab.windowId].label),
         age ? el('span', {
           className: 'tab-age',
           title: new Date(tab.lastAccessed).toLocaleString(),

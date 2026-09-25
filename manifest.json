@@ -3,7 +3,7 @@
   "name": "Tab Deduplicator",
   "version": "1.0.0",
   "description": "Find and close duplicate tabs across all open windows.",
-  "permissions": ["tabs", "storage"],
+  "permissions": ["tabs", "storage", "nativeMessaging"],
   "background": {
     "service_worker": "background.js"
   },
